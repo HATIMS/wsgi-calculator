@@ -1,3 +1,5 @@
+import traceback
+
 """
 For your homework this week, you'll be creating a wsgi application of
 your own.
@@ -36,20 +38,43 @@ To submit your homework:
   * I should also be able to see a home page (http://localhost:8080/)
     that explains how to perform calculations.
   * Commit and push your changes to your fork.
-  * Submit a link to your Session03 fork repository!
-
+  * Submit a link to your Session04 fork repository!
 
 """
 
+def multiply(*args):
+  arg_0 = int(args[0])
+  arg_1 = int(args[1])
+  result = arg_0 * arg_1
+
+  return str(result)
+
+def subtract(*args):
+  arg_0 = int(args[0])
+  arg_1 = int(args[1])
+  result = arg_0 - arg_1
+
+  return str(result)
+
+def divide(*args):
+  arg_0 = int(args[0])
+  arg_1 = int(args[1])
+  try:
+    result = arg_0 / arg_1
+  except ZeroDivisionError:
+    return None
+  return str(result)
 
 def add(*args):
     """ Returns a STRING with the sum of the arguments """
 
     # TODO: Fill sum with the correct value, based on the
     # args provided.
-    sum = "0"
+    arg_0 = int(args[0])
+    arg_1 = int(args[1])
+    result = arg_0 + arg_1
 
-    return sum
+    return str(result)
 
 # TODO: Add functions for handling more arithmetic operations.
 
@@ -63,8 +88,16 @@ def resolve_path(path):
     # examples provide the correct *syntax*, but you should
     # determine the actual values of func and args using the
     # path.
-    func = add
-    args = ['25', '32']
+    routes = {
+      'add': add, 
+      'multiply': multiply, 
+      'subtract': subtract, 
+      'divide': divide
+    }
+    path = path.strip('/').split('/')
+    func_name = path.pop(0)
+    func = routes.get(func_name)
+    args = path
 
     return func, args
 
@@ -76,9 +109,42 @@ def application(environ, start_response):
     #
     # TODO (bonus): Add error handling for a user attempting
     # to divide by zero.
-    pass
+    headers = [("Content-type", "text/html")]
+    try:
+        path = environ.get('PATH_INFO', None)
+        if path is None:
+            raise NameError
+        if path == '/':
+          body = """<html><h1>Here's how to use this page...<h2>
+              <h2>visit the following pages and see a page with the indicated content:</h2>
+              <p>* http://localhost:8080/multiply/3/5  => 15</p>
+              <p>* http://localhost:8080/add/23/42  => 65<p>
+              <p>* http://localhost:8080/subtract/23/42  => -19</p></html>"""
+          status = "200 OK"
+        else:
+          func, args = resolve_path(path)
+          body = func(*args)
+          status = "200 OK"
+        if body is None:
+          raise ZeroDivisionError
+    except NameError:
+        status = "404 Not Found"
+        body = "<h1>Not Found</h1>"
+    except ZeroDivisionError:
+        status = "405 Method Not Allowed"
+        body = "<h1>Can't divide by zero</h1>"
+    except Exception:
+        status = "500 Internal Server Error"
+        body = "<h1>Internal Server Error</h1>"
+        print(traceback.format_exc())
+    finally:
+        headers.append(('Content-length', str(len(body))))
+        start_response(status, headers)
+        return [body.encode('utf8')]
 
 if __name__ == '__main__':
     # TODO: Insert the same boilerplate wsgiref simple
     # server creation that you used in the book database.
-    pass
+    from wsgiref.simple_server import make_server
+    srv = make_server('localhost', 8080, application)
+    srv.serve_forever()
